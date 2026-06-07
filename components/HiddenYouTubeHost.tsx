@@ -130,7 +130,9 @@ export default function HiddenYouTubeHost() {
             } catch {
               /* noop */
             }
-            playerRef.current = e.target as typeof playerRef.current;
+            playerRef.current = e.target as YouTubePlayerHandle & {
+              destroy(): void;
+            };
             _registerYoutubePlayer(e.target);
             // Push initial duration if available
             try {
