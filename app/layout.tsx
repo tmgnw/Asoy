@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import Player from "@/components/Player";
+import MobileNav from "@/components/MobileNav";
 import { PlayerProvider } from "@/components/PlayerProvider";
 import HiddenYouTubeHost from "@/components/HiddenYouTubeHost";
 
@@ -25,6 +26,7 @@ export default function RootLayout({
               </main>
             </div>
             <Player />
+            <MobileNav />
           </div>
           <HiddenYouTubeHost />
         </PlayerProvider>

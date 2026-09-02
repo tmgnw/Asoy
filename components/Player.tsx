@@ -56,6 +56,20 @@ function PauseIcon() {
     </svg>
   );
 }
+function PrevIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M6 6h2v12H6V6Zm12 0v12L8 12l10-6Z" />
+    </svg>
+  );
+}
+function NextIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16 6h2v12h-2V6ZM6 6l10 6L6 18V6Z" />
+    </svg>
+  );
+}
 
 function fmt(ms: number) {
   if (!Number.isFinite(ms) || ms <= 0) return "0:00";
@@ -87,32 +101,68 @@ export default function Player() {
   const elapsedMs = totalMs * progress;
   const canPlay = source === "full" || source === "preview" || source === "youtube";
   const hasQueue = queue.length > 1 && queueIndex >= 0;
+  const progressPct = Math.min(100, Math.max(0, progress * 100));
+
+  // Shared track thumbnail + title/artist — used by both the mobile mini-player
+  // and the desktop bar.
+  const trackInfo = (
+    <div className="flex items-center gap-3 min-w-0">
+      {current?.albumImage ? (
+        <Image
+          src={current.albumImage}
+          alt=""
+          width={56}
+          height={56}
+          className="size-12 md:size-14 rounded shrink-0 object-cover"
+        />
+      ) : (
+        <div className="size-12 md:size-14 rounded shrink-0 bg-[var(--surface-3)]" />
+      )}
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium">{current?.name ?? "—"}</div>
+        <div className="truncate text-xs text-white/60">
+          {current?.artistNames ?? "Pick a track to start"}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <footer className="h-[92px] shrink-0 px-4 py-2 bg-black text-white border-t border-white/5">
-      <div className="grid grid-cols-3 items-center h-full gap-4">
-        {/* Track info */}
-        <div className="flex items-center gap-3 min-w-0">
-          {current?.albumImage ? (
-            <Image
-              src={current.albumImage}
-              alt=""
-              width={56}
-              height={56}
-              className="size-14 rounded shrink-0 object-cover"
-            />
-          ) : (
-            <div className="size-14 rounded shrink-0 bg-[var(--surface-3)]" />
-          )}
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium">
-              {current?.name ?? "—"}
-            </div>
-            <div className="truncate text-xs text-white/60">
-              {current?.artistNames ?? "Pick a track to start"}
-            </div>
+    <footer className="relative shrink-0 bg-black text-white border-t border-white/5">
+      {/* ---------- Mobile mini-player (below md) ---------- */}
+      <div className="md:hidden">
+        {/* Slim progress line pinned to the top edge of the bar */}
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-white/15">
+          <div
+            className="h-full bg-white"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <div className="flex items-center gap-2 px-3 h-16">
+          <div className="min-w-0 flex-1">{trackInfo}</div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Btn ariaLabel="Previous" onClick={prev} disabled={!hasQueue}>
+              <PrevIcon />
+            </Btn>
+            <Btn
+              ariaLabel={isPlaying ? "Pause" : "Play"}
+              onClick={toggle}
+              primary
+              disabled={!canPlay}
+            >
+              {isPlaying ? <PauseIcon /> : <PlayIcon />}
+            </Btn>
+            <Btn ariaLabel="Next" onClick={next} disabled={!hasQueue}>
+              <NextIcon />
+            </Btn>
           </div>
         </div>
+      </div>
+
+      {/* ---------- Desktop bar (md and up) ---------- */}
+      <div className="hidden md:grid grid-cols-3 items-center h-[92px] px-4 py-2 gap-4">
+        {/* Track info */}
+        {trackInfo}
 
         {/* Controls */}
         <div className="flex flex-col items-center gap-1">
@@ -127,14 +177,8 @@ export default function Player() {
                 <path d="M17 3h4v4h-2V6.41l-3.3 3.3-1.4-1.42L17.58 5H17V3Zm4 14v4h-4v-2h.58l-3.3-3.3 1.42-1.4L19 17.58V17h2ZM3 5h4l9 14h5v2h-6L6 7H3V5Zm0 14h4l2-3.1-1.2-1.86L6.4 17H3v2Z" />
               </svg>
             </Btn>
-            <Btn
-              ariaLabel="Previous"
-              onClick={prev}
-              disabled={!hasQueue}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6 6h2v12H6V6Zm12 0v12L8 12l10-6Z" />
-              </svg>
+            <Btn ariaLabel="Previous" onClick={prev} disabled={!hasQueue}>
+              <PrevIcon />
             </Btn>
             <Btn
               ariaLabel={isPlaying ? "Pause" : "Play"}
@@ -144,14 +188,8 @@ export default function Player() {
             >
               {isPlaying ? <PauseIcon /> : <PlayIcon />}
             </Btn>
-            <Btn
-              ariaLabel="Next"
-              onClick={next}
-              disabled={!hasQueue}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M16 6h2v12h-2V6ZM6 6l10 6L6 18V6Z" />
-              </svg>
+            <Btn ariaLabel="Next" onClick={next} disabled={!hasQueue}>
+              <NextIcon />
             </Btn>
             <Btn
               ariaLabel="Repeat"

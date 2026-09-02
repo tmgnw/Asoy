@@ -53,7 +53,7 @@ export default async function Home() {
                 preview.
               </p>
             </div>
-            <span className="text-[10px] uppercase tracking-wider text-white/50">
+            <span className="hidden sm:block shrink-0 text-[10px] uppercase tracking-wider text-white/50">
               Global · Live
             </span>
           </div>
@@ -77,7 +77,7 @@ export default async function Home() {
                 pendengar saat ini.
               </p>
             </div>
-            <span className="text-[10px] uppercase tracking-wider text-white/50">
+            <span className="hidden sm:block shrink-0 text-[10px] uppercase tracking-wider text-white/50">
               Updated live
             </span>
           </div>
