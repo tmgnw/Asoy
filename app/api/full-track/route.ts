@@ -105,11 +105,14 @@ export async function GET(request: NextRequest) {
 
   // Audius miss → look up a YouTube video ID. Public Invidious/Piped instances
   // are too flaky, and listType=search has been deprecated by YouTube since
-  // 2018, so we scrape YouTube's HTML search-results page for the first
-  // videoId. Fragile if YouTube changes its markup, but reliable today and
-  // requires no API key.
+  // 2018, so we query YouTube's internal "InnerTube" search API (the same one
+  // youtube.com itself calls). Unlike scraping the HTML results page — which
+  // gets served an EU cookie-consent interstitial with no results when called
+  // from datacenter IPs like Vercel's functions — the InnerTube endpoint
+  // returns structured JSON regardless of region. HTML scrape stays as a
+  // last-resort fallback for the rare case InnerTube is unavailable.
   const searchQuery = `${artist} ${title}`.trim();
-  const videoId = searchQuery ? await scrapeYoutubeFirstVideoId(searchQuery) : null;
+  const videoId = searchQuery ? await findYoutubeVideoId(searchQuery) : null;
   if (videoId) {
     return Response.json({
       streamUrl: null,
@@ -122,6 +125,84 @@ export async function GET(request: NextRequest) {
     streamUrl: null,
     reason: "no match on Audius or YouTube",
   });
+}
+
+/**
+ * Find the best-matching YouTube video id for a query. Tries the InnerTube
+ * JSON API first (works from datacenter IPs), then falls back to scraping the
+ * HTML results page.
+ */
+async function findYoutubeVideoId(query: string): Promise<string | null> {
+  return (
+    (await youtubeInnertubeSearch(query)) ??
+    (await scrapeYoutubeFirstVideoId(query))
+  );
+}
+
+// Public "WEB" client key baked into youtube.com's own frontend. Not a secret
+// and not user-specific — it just identifies the InnerTube client surface.
+const YT_INNERTUBE_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+/** Query YouTube's internal search API and return the top video result's id. */
+async function youtubeInnertubeSearch(query: string): Promise<string | null> {
+  try {
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(
+      `https://www.youtube.com/youtubei/v1/search?key=${YT_INNERTUBE_KEY}&prettyPrint=false`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36",
+        },
+        body: JSON.stringify({
+          context: {
+            client: {
+              clientName: "WEB",
+              clientVersion: "2.20240101.00.00",
+              hl: "en",
+              gl: "US",
+            },
+          },
+          query,
+        }),
+        signal: ctrl.signal,
+        next: { revalidate: 3600 },
+      },
+    );
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return firstVideoIdFromInnertube(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Walk an InnerTube search response and return the first `videoRenderer`'s id
+ * in document order (i.e. the top organic result). Recursive rather than
+ * path-based so it survives YouTube reshuffling the response nesting, and it
+ * naturally skips channel/playlist/ad renderers since they aren't videos.
+ */
+function firstVideoIdFromInnertube(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  const vr = (node as { videoRenderer?: { videoId?: unknown } }).videoRenderer;
+  if (
+    vr &&
+    typeof vr.videoId === "string" &&
+    /^[a-zA-Z0-9_-]{11}$/.test(vr.videoId)
+  ) {
+    return vr.videoId;
+  }
+  const values = Array.isArray(node) ? node : Object.values(node);
+  for (const v of values) {
+    const found = firstVideoIdFromInnertube(v);
+    if (found) return found;
+  }
+  return null;
 }
 
 async function scrapeYoutubeFirstVideoId(query: string): Promise<string | null> {
